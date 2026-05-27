@@ -90,6 +90,8 @@ Place it at `./checkpoints/chexbert.pth` (or specify via `--chexbert_checkpoint`
 
 A simple web interface for single-image report generation and evaluation:
 
+![Web Demo Screenshot](assets/web_demo_screenshot.png)
+
 ```bash
 pip install gradio openai
 python app.py

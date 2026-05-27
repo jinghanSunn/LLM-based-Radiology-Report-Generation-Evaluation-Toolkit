@@ -72,10 +72,14 @@ def compute_meteor_score(reference: str, hypothesis: str) -> dict:
     try:
         from nltk.translate.meteor_score import meteor_score
         import nltk
-        for resource, name in [('corpora/wordnet', 'wordnet'), ('corpora/omw-1.4', 'omw-1.4')]:
+        for resource, name in [
+            ('tokenizers/punkt_tab', 'punkt_tab'),
+            ('corpora/wordnet', 'wordnet'),
+            ('corpora/omw-1.4', 'omw-1.4'),
+        ]:
             try:
                 nltk.data.find(resource)
-            except (LookupError, Exception):
+            except (LookupError, OSError, Exception):
                 nltk.download(name, quiet=True)
     except ImportError:
         return {"error": "nltk not installed. Run: pip install nltk"}
