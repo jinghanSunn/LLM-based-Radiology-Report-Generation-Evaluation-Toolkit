@@ -10,6 +10,7 @@ While we provide out-of-the-box support for Qwen series models (Qwen2.5-VL, Qwen
 
 ```
 .
+├── app.py                         # 🌐 Web demo (Gradio-based UI)
 ├── qwen_report_generation.py      # Qwen VL inference for report generation
 ├── evaluate_chexbert.py           # CheXbert-based clinical accuracy evaluation
 ├── evaluate_nlg.py                # NLG metrics (BLEU, ROUGE, METEOR, BERTScore, etc.)
@@ -32,6 +33,9 @@ While we provide out-of-the-box support for Qwen series models (Qwen2.5-VL, Qwen
 
 ```bash
 pip install -r requirements.txt
+
+# For the web demo
+pip install gradio openai
 ```
 
 For optional clinical metrics:
@@ -82,7 +86,41 @@ Download the CheXbert checkpoint from:
 
 Place it at `./checkpoints/chexbert.pth` (or specify via `--chexbert_checkpoint`).
 
-## 📖 Usage
+## 🌐 Web Demo
+
+A simple web interface for single-image report generation and evaluation:
+
+```bash
+pip install gradio openai
+python app.py
+```
+
+Then open `http://localhost:7860` in your browser.
+
+**Features:**
+- Upload a chest X-ray image and generate a report instantly
+- **API mode**: Use any OpenAI-compatible API (OpenAI, vLLM, Ollama, Together AI, etc.)
+- **Local mode**: Load a HuggingFace model locally (requires GPU)
+- Optionally paste a ground truth report to compute metrics (BLEU, ROUGE-L, METEOR)
+
+**Options:**
+```bash
+python app.py --port 7860 --share  # Create a public Gradio link
+python app.py --server_name 127.0.0.1  # Localhost only
+```
+
+**Supported API providers:**
+| Provider | API Base URL |
+|----------|-------------|
+| OpenAI | (leave empty, uses default) |
+| vLLM (local) | `http://localhost:8000/v1` |
+| Ollama | `http://localhost:11434/v1` |
+| Together AI | `https://api.together.xyz/v1` |
+| Any OpenAI-compatible | Your endpoint URL |
+
+---
+
+## 📖 Usage (Batch / Command Line)
 
 ### 1. Report Generation
 

@@ -24,3 +24,7 @@ numpy>=1.21
 # Utilities
 tqdm>=4.62
 openpyxl>=3.0
+
+# Web Demo
+gradio>=4.0
+openai>=1.0
