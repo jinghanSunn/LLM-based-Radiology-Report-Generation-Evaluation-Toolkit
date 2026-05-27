@@ -356,8 +356,18 @@ def generate_and_evaluate(
 def build_app():
     """Build the Gradio interface."""
 
+    custom_css = """
+    * {
+        font-family: Georgia, 'Times New Roman', Times, serif !important;
+    }
+    code, pre, .code, .mono {
+        font-family: 'Courier New', Courier, monospace !important;
+    }
+    """
+
     with gr.Blocks(
         title="🏥 Radiology Report Generation & Evaluation",
+        css=custom_css,
     ) as app:
         gr.Markdown("""
 # 🏥 Radiology Report Generation & Evaluation
@@ -501,5 +511,4 @@ if __name__ == "__main__":
         server_name=args.server_name,
         server_port=args.port,
         share=args.share,
-        theme=gr.themes.Soft(),
     )

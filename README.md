@@ -1,6 +1,6 @@
 # LLM-based Radiology Report Generation & Evaluation Toolkit
 
-A toolkit for generating radiology reports from chest X-ray images using Large Language Models (LLMs), and evaluating the generated reports with multiple clinical and NLG metrics.
+A toolkit for generating radiology reports from chest X-ray images using Large Language Models (LLMs), and evaluating the generated reports with multiple clinical and NLG metrics. It also includes a **Gradio-based Web Demo** for interactive single-image report generation and evaluation.
 
 While we provide out-of-the-box support for Qwen series models (Qwen2.5-VL, Qwen3-VL, Qwen3.5), the evaluation pipeline is **model-agnostic** — any LLM-generated reports in the supported JSON format can be evaluated.
 
