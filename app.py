@@ -355,7 +355,6 @@ def build_app():
 
     with gr.Blocks(
         title="🏥 Radiology Report Generation & Evaluation",
-        theme=gr.themes.Soft(),
     ) as app:
         gr.Markdown("""
 # 🏥 Radiology Report Generation & Evaluation
@@ -433,7 +432,6 @@ Optionally provide a ground truth report to compute evaluation metrics (BLEU, RO
                 report_output = gr.Textbox(
                     label="Generated Report",
                     lines=12,
-                    show_copy_button=True,
                 )
 
                 gr.Markdown("### 📊 Evaluation Metrics")
@@ -500,4 +498,5 @@ if __name__ == "__main__":
         server_name=args.server_name,
         server_port=args.port,
         share=args.share,
+        theme=gr.themes.Soft(),
     )
