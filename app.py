@@ -36,11 +36,6 @@ def compute_bleu_scores(reference: str, hypothesis: str) -> dict:
     """Compute BLEU-1/2/3/4 for a single pair."""
     try:
         from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
-        import nltk
-        try:
-            nltk.data.find('tokenizers/punkt_tab')
-        except LookupError:
-            nltk.download('punkt_tab', quiet=True)
     except ImportError:
         return {"error": "nltk not installed. Run: pip install nltk"}
 
@@ -175,7 +170,11 @@ def generate_report_api(
     mime_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".gif": "image/gif"}
     mime_type = mime_map.get(ext, "image/jpeg")
 
-    client = OpenAI(api_key=api_key, base_url=api_base if api_base.strip() else None)
+    client = OpenAI(
+        api_key=api_key,
+        base_url=api_base if api_base.strip() else None,
+        timeout=120.0,  # 2 minutes timeout for large image requests
+    )
 
     messages = [
         {
