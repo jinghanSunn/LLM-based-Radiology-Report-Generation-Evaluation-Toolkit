@@ -1,4 +1,4 @@
-# LLM-based Radiology Report Generation & Evaluation Toolkit
+# LLM-based Radiology Report Generation & Evaluation Toolkit (with Web Demo)
 
 A toolkit for generating radiology reports from chest X-ray images using Large Language Models (LLMs), and evaluating the generated reports with multiple clinical and NLG metrics. It also includes a **Gradio-based Web Demo** for interactive single-image report generation and evaluation.
 
