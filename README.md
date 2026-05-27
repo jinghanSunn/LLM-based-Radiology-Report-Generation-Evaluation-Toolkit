@@ -1,6 +1,8 @@
-# Qwen Radiology Report Generation & Evaluation Toolkit
+# LLM-based Radiology Report Generation & Evaluation Toolkit
 
-A toolkit for generating radiology reports from chest X-ray images using Qwen Vision-Language Models, and evaluating the generated reports with multiple clinical and NLG metrics.
+A toolkit for generating radiology reports from chest X-ray images using Large Language Models (LLMs), and evaluating the generated reports with multiple clinical and NLG metrics.
+
+While we provide out-of-the-box support for Qwen series models (Qwen2.5-VL, Qwen3-VL, Qwen3.5), the evaluation pipeline is **model-agnostic** — any LLM-generated reports in the supported JSON format can be evaluated.
 
 > 📊 **[Jump to Experimental Results ↓](#-experimental-results)**
 
@@ -88,14 +90,14 @@ Generate radiology reports from chest X-ray images using Qwen VL models:
 
 ```bash
 # Using Qwen2.5-VL-7B (default)
-CUDA_VISIBLE_DEVICES=0,1 python qwen_report_generation.py \
+python qwen_report_generation.py \
     --model_name Qwen/Qwen2.5-VL-7B-Instruct \
     --question_file ./data/test_dataset.json \
     --output_file ./results/qwen_output.json \
     --max_tokens 512
 
 # Using Qwen3-VL-8B
-CUDA_VISIBLE_DEVICES=0,1 python qwen_report_generation.py \
+python qwen_report_generation.py \
     --model_name Qwen/Qwen3-VL-8B-Instruct \
     --model_type qwen3vl \
     --question_file ./data/test_dataset.json \
@@ -103,7 +105,7 @@ CUDA_VISIBLE_DEVICES=0,1 python qwen_report_generation.py \
     --max_tokens 512
 
 # With thinking mode (Qwen3.5)
-CUDA_VISIBLE_DEVICES=0,1,2,3 python qwen_report_generation.py \
+python qwen_report_generation.py \
     --model_name Qwen/Qwen3.5-27B \
     --question_file ./data/test_dataset.json \
     --output_file ./results/qwen35_output.json \
@@ -186,7 +188,7 @@ python evaluate_nlg.py \
 Use another LLM as a label extractor (alternative to CheXbert):
 
 ```bash
-CUDA_VISIBLE_DEVICES=0,1 python evaluate_llm_as_labeler.py \
+python evaluate_llm_as_labeler.py \
     --llm_output ./results/qwen_output.json \
     --annotation_json ./data/annotation.json \
     --labeler_model Qwen/Qwen2.5-7B-Instruct \
@@ -222,70 +224,96 @@ Below are our evaluation results comparing different models on the MIMIC-CXR tes
 
 ### CheXbert as Labeler
 
-| | Qwen3.5-27B | | | | Qwen3-VL-8B | | | |
-|---------|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **Disease** | **AUC** | **F1** | **Recall** | **Spec** | **AUC** | **F1** | **Recall** | **Spec** |
-| Enlarged Cardiomediastinum | 0.4955 | 0.1097 | 0.1921 | 0.7988 | 0.4758 | 0.1303 | 0.5424 | 0.4092 |
-| Cardiomegaly | 0.6989 | 0.6551 | 0.9193 | 0.4784 | 0.5827 | 0.5703 | 0.8924 | 0.273 |
-| Lung Opacity | 0.5988 | 0.5238 | 0.5643 | 0.6332 | 0.5772 | 0.5359 | 0.0694 | 0.485 |
-| Lung Lesion | 0.5072 | 0.0482 | 0.0317 | 0.9827 | 0.5001 | 0.0337 | 0.0238 | 0.9765 |
-| Edema | 0.6842 | 0.4471 | 0.6485 | 0.7198 | 0.5624 | 0.3115 | 0.4653 | 0.6595 |
-| Consolidation | 0.5145 | 0.0671 | 0.0485 | 0.9805 | 0.5141 | 0.0797 | 0.1165 | 0.9117 |
-| Pneumonia | 0.5529 | 0.1505 | 0.1400 | 0.9659 | 0.5074 | 0.0354 | 0.02 | 0.9948 |
-| Atelectasis | 0.5513 | 0.2854 | 0.2153 | 0.8873 | 0.5008 | 0.0128 | 0.0065 | 0.995 |
-| Pneumothorax | 0.6280 | 0.3171 | 0.2653 | 0.9907 | 0.5081 | 0.0339 | 0.0204 | 0.9958 |
-| Pleural Effusion | 0.7105 | 0.6190 | 0.6190 | 0.8019 | 0.5505 | 0.2796 | 0.1905 | 0.9106 |
-| Pleural Other | 0.5142 | 0.0556 | 0.0294 | 0.9991 | 0.4958 | 0 | 0 | 0.9916 |
-| Fracture | 0.4995 | 0.0000 | 0.0000 | 0.9990 | 0.499 | 0 | 0 | 0.9981 |
-| Support Devices | 0.6783 | 0.5688 | 0.4547 | 0.9019 | 0.645 | 0.5574 | 0.5128 | 0.7772 |
-| No Finding | 0.6520 | 0.2557 | 0.4242 | 0.8797 | 0.5023 | 0.0144 | 0.0076 | 0.9971 |
-| **Macro Average** | **0.5918** | **0.2931** | **0.3252** | **0.8585** | **0.5301** | **0.1854** | **0.2477** | **0.8125** |
+<table>
+<tr>
+<th rowspan="2">Disease</th>
+<th colspan="4" align="center">Qwen3.5-27B</th>
+<th colspan="4" align="center">Qwen3-VL-8B</th>
+</tr>
+<tr>
+<th>AUC</th><th>F1</th><th>Recall</th><th>Spec</th>
+<th>AUC</th><th>F1</th><th>Recall</th><th>Spec</th>
+</tr>
+<tr><td>Enlarged Cardiomediastinum</td><td>0.4955</td><td>0.1097</td><td>0.1921</td><td>0.7988</td><td>0.4758</td><td>0.1303</td><td>0.5424</td><td>0.4092</td></tr>
+<tr><td>Cardiomegaly</td><td>0.6989</td><td>0.6551</td><td>0.9193</td><td>0.4784</td><td>0.5827</td><td>0.5703</td><td>0.8924</td><td>0.273</td></tr>
+<tr><td>Lung Opacity</td><td>0.5988</td><td>0.5238</td><td>0.5643</td><td>0.6332</td><td>0.5772</td><td>0.5359</td><td>0.0694</td><td>0.485</td></tr>
+<tr><td>Lung Lesion</td><td>0.5072</td><td>0.0482</td><td>0.0317</td><td>0.9827</td><td>0.5001</td><td>0.0337</td><td>0.0238</td><td>0.9765</td></tr>
+<tr><td>Edema</td><td>0.6842</td><td>0.4471</td><td>0.6485</td><td>0.7198</td><td>0.5624</td><td>0.3115</td><td>0.4653</td><td>0.6595</td></tr>
+<tr><td>Consolidation</td><td>0.5145</td><td>0.0671</td><td>0.0485</td><td>0.9805</td><td>0.5141</td><td>0.0797</td><td>0.1165</td><td>0.9117</td></tr>
+<tr><td>Pneumonia</td><td>0.5529</td><td>0.1505</td><td>0.1400</td><td>0.9659</td><td>0.5074</td><td>0.0354</td><td>0.02</td><td>0.9948</td></tr>
+<tr><td>Atelectasis</td><td>0.5513</td><td>0.2854</td><td>0.2153</td><td>0.8873</td><td>0.5008</td><td>0.0128</td><td>0.0065</td><td>0.995</td></tr>
+<tr><td>Pneumothorax</td><td>0.6280</td><td>0.3171</td><td>0.2653</td><td>0.9907</td><td>0.5081</td><td>0.0339</td><td>0.0204</td><td>0.9958</td></tr>
+<tr><td>Pleural Effusion</td><td>0.7105</td><td>0.6190</td><td>0.6190</td><td>0.8019</td><td>0.5505</td><td>0.2796</td><td>0.1905</td><td>0.9106</td></tr>
+<tr><td>Pleural Other</td><td>0.5142</td><td>0.0556</td><td>0.0294</td><td>0.9991</td><td>0.4958</td><td>0</td><td>0</td><td>0.9916</td></tr>
+<tr><td>Fracture</td><td>0.4995</td><td>0.0000</td><td>0.0000</td><td>0.9990</td><td>0.499</td><td>0</td><td>0</td><td>0.9981</td></tr>
+<tr><td>Support Devices</td><td>0.6783</td><td>0.5688</td><td>0.4547</td><td>0.9019</td><td>0.645</td><td>0.5574</td><td>0.5128</td><td>0.7772</td></tr>
+<tr><td>No Finding</td><td>0.6520</td><td>0.2557</td><td>0.4242</td><td>0.8797</td><td>0.5023</td><td>0.0144</td><td>0.0076</td><td>0.9971</td></tr>
+<tr><td><b>Macro Average</b></td><td><b>0.5918</b></td><td><b>0.2931</b></td><td><b>0.3252</b></td><td><b>0.8585</b></td><td><b>0.5301</b></td><td><b>0.1854</b></td><td><b>0.2477</b></td><td><b>0.8125</b></td></tr>
+</table>
 
 ### Qwen3.5 as Labeler
 
-| | Qwen3.5-27B | | | | Qwen3-VL-8B | | | |
-|---------|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **Disease** | **AUC** | **F1** | **Recall** | **Spec** | **AUC** | **F1** | **Recall** | **Spec** |
-| Enlarged Cardiomediastinum | 0.6108 | 0.3622 | 0.6525 | 0.5691 | 0.5487 | 0.3088 | 0.5875 | 0.5099 |
-| Cardiomegaly | 0.7090 | 0.6466 | 0.9278 | 0.4902 | 0.5925 | 0.5561 | 0.8789 | 0.3061 |
-| Lung Opacity | 0.6253 | 0.5931 | 0.6915 | 0.5592 | 0.5938 | 0.5899 | 0.7758 | 0.4118 |
-| Lung Lesion | 0.5288 | 0.1085 | 0.0619 | 0.9957 | 0.4950 | 0.0000 | 0.0000 | 0.9900 |
-| Edema | 0.7031 | 0.5464 | 0.6577 | 0.7486 | 0.5773 | 0.3986 | 0.5207 | 0.6338 |
-| Consolidation | 0.5263 | 0.0990 | 0.0926 | 0.9600 | 0.5049 | 0.0721 | 0.1111 | 0.8987 |
-| Pneumonia | 0.5689 | 0.1200 | 0.1800 | 0.9579 | 0.5012 | 0.0225 | 0.0200 | 0.9824 |
-| Atelectasis | 0.5547 | 0.3080 | 0.2324 | 0.8771 | 0.5046 | 0.0446 | 0.0235 | 0.9856 |
-| Pneumothorax | 0.6533 | 0.3373 | 0.3182 | 0.9885 | 0.4979 | 0 | 0.0000 | 0.9958 |
-| Pleural Effusion | 0.7217 | 0.6276 | 0.6293 | 0.8141 | 0.5635 | 0.3197 | 0.2298 | 0.8972 |
-| Pleural Other | 0.5123 | 0.0482 | 0.0250 | 0.9995 | 0.5085 | 0.0404 | 0.0250 | 0.9920 |
-| Fracture | 0.4998 | 0.0000 | 0.0000 | 0.9995 | 0.5000 | 0.0000 | 0.0000 | 1.0000 |
-| Support Devices | 0.7365 | 0.8042 | 0.8640 | 0.6090 | 0.6835 | 0.7376 | 0.7451 | 0.6219 |
-| No Finding | 0.8213 | 0.2918 | 0.8571 | 0.7855 | 0.7823 | 0.3162 | 0.7143 | 0.8503 |
-| **Macro Average** | **0.6266** | **0.3495** | **0.4421** | **0.8110** | **0.5610** | **0.2433** | **0.3308** | **0.7911** |
+<table>
+<tr>
+<th rowspan="2">Disease</th>
+<th colspan="4" align="center">Qwen3.5-27B</th>
+<th colspan="4" align="center">Qwen3-VL-8B</th>
+</tr>
+<tr>
+<th>AUC</th><th>F1</th><th>Recall</th><th>Spec</th>
+<th>AUC</th><th>F1</th><th>Recall</th><th>Spec</th>
+</tr>
+<tr><td>Enlarged Cardiomediastinum</td><td>0.6108</td><td>0.3622</td><td>0.6525</td><td>0.5691</td><td>0.5487</td><td>0.3088</td><td>0.5875</td><td>0.5099</td></tr>
+<tr><td>Cardiomegaly</td><td>0.7090</td><td>0.6466</td><td>0.9278</td><td>0.4902</td><td>0.5925</td><td>0.5561</td><td>0.8789</td><td>0.3061</td></tr>
+<tr><td>Lung Opacity</td><td>0.6253</td><td>0.5931</td><td>0.6915</td><td>0.5592</td><td>0.5938</td><td>0.5899</td><td>0.7758</td><td>0.4118</td></tr>
+<tr><td>Lung Lesion</td><td>0.5288</td><td>0.1085</td><td>0.0619</td><td>0.9957</td><td>0.4950</td><td>0.0000</td><td>0.0000</td><td>0.9900</td></tr>
+<tr><td>Edema</td><td>0.7031</td><td>0.5464</td><td>0.6577</td><td>0.7486</td><td>0.5773</td><td>0.3986</td><td>0.5207</td><td>0.6338</td></tr>
+<tr><td>Consolidation</td><td>0.5263</td><td>0.0990</td><td>0.0926</td><td>0.9600</td><td>0.5049</td><td>0.0721</td><td>0.1111</td><td>0.8987</td></tr>
+<tr><td>Pneumonia</td><td>0.5689</td><td>0.1200</td><td>0.1800</td><td>0.9579</td><td>0.5012</td><td>0.0225</td><td>0.0200</td><td>0.9824</td></tr>
+<tr><td>Atelectasis</td><td>0.5547</td><td>0.3080</td><td>0.2324</td><td>0.8771</td><td>0.5046</td><td>0.0446</td><td>0.0235</td><td>0.9856</td></tr>
+<tr><td>Pneumothorax</td><td>0.6533</td><td>0.3373</td><td>0.3182</td><td>0.9885</td><td>0.4979</td><td>0</td><td>0.0000</td><td>0.9958</td></tr>
+<tr><td>Pleural Effusion</td><td>0.7217</td><td>0.6276</td><td>0.6293</td><td>0.8141</td><td>0.5635</td><td>0.3197</td><td>0.2298</td><td>0.8972</td></tr>
+<tr><td>Pleural Other</td><td>0.5123</td><td>0.0482</td><td>0.0250</td><td>0.9995</td><td>0.5085</td><td>0.0404</td><td>0.0250</td><td>0.9920</td></tr>
+<tr><td>Fracture</td><td>0.4998</td><td>0.0000</td><td>0.0000</td><td>0.9995</td><td>0.5000</td><td>0.0000</td><td>0.0000</td><td>1.0000</td></tr>
+<tr><td>Support Devices</td><td>0.7365</td><td>0.8042</td><td>0.8640</td><td>0.6090</td><td>0.6835</td><td>0.7376</td><td>0.7451</td><td>0.6219</td></tr>
+<tr><td>No Finding</td><td>0.8213</td><td>0.2918</td><td>0.8571</td><td>0.7855</td><td>0.7823</td><td>0.3162</td><td>0.7143</td><td>0.8503</td></tr>
+<tr><td><b>Macro Average</b></td><td><b>0.6266</b></td><td><b>0.3495</b></td><td><b>0.4421</b></td><td><b>0.8110</b></td><td><b>0.5610</b></td><td><b>0.2433</b></td><td><b>0.3308</b></td><td><b>0.7911</b></td></tr>
+</table>
 
 ### Difference (Qwen3.5 as Labeler − CheXbert as Labeler)
 
-| | Qwen3.5-27B | | | | Qwen3-VL-8B | | | |
-|---------|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **Disease** | **ΔAUC** | **ΔF1** | **ΔRecall** | **ΔSpec** | **ΔAUC** | **ΔF1** | **ΔRecall** | **ΔSpec** |
-| Enlarged Cardiomediastinum | 0.1153 | 0.2525 | **0.4604** | −0.2297 | 0.0729 | 0.1785 | 0.0451 | 0.1007 |
-| Cardiomegaly | 0.0101 | −0.0085 | 0.0085 | 0.0118 | 0.0098 | −0.0142 | −0.0135 | 0.0331 |
-| Lung Opacity | 0.0265 | 0.0693 | **0.1272** | −0.0740 | 0.0166 | 0.0540 | 0.1064 | −0.0732 |
-| Lung Lesion | 0.0216 | 0.0603 | 0.0302 | 0.0130 | −0.0051 | −0.0337 | −0.0238 | 0.0135 |
-| Edema | 0.0189 | 0.0993 | 0.0092 | 0.0288 | 0.0149 | 0.0871 | 0.0554 | −0.0257 |
-| Consolidation | 0.0118 | 0.0319 | 0.0441 | −0.0205 | −0.0092 | −0.0076 | −0.0054 | −0.0130 |
-| Pneumonia | 0.0160 | −0.0305 | 0.0400 | −0.0080 | −0.0062 | −0.0129 | 0.0000 | −0.0124 |
-| Atelectasis | 0.0034 | 0.0226 | 0.0171 | −0.0102 | 0.0038 | 0.0318 | 0.0170 | −0.0094 |
-| Pneumothorax | 0.0253 | 0.0202 | 0.0529 | −0.0022 | −0.0102 | −0.0339 | −0.0204 | 0.0000 |
-| Pleural Effusion | 0.0112 | 0.0086 | 0.0103 | 0.0122 | 0.0130 | 0.0401 | 0.0393 | −0.0134 |
-| Pleural Other | −0.0019 | −0.0074 | −0.0044 | 0.0004 | 0.0127 | 0.0404 | 0.0250 | 0.0004 |
-| Fracture | 0.0003 | 0.0000 | 0.0000 | 0.0005 | 0.0010 | 0.0000 | 0.0000 | 0.0019 |
-| Support Devices | 0.0582 | 0.2354 | **0.4093** | −0.2929 | 0.0385 | 0.1802 | 0.2323 | −0.1553 |
-| No Finding | 0.1693 | 0.0361 | **0.4329** | −0.0942 | 0.2800 | 0.3018 | 0.7067 | −0.1468 |
-| **MACRO AVERAGE** | **0.0348** | **0.0564** | **0.1169** | **−0.0475** | **0.0309** | **0.0579** | **0.0831** | **−0.0214** |
+<table>
+<tr>
+<th rowspan="2">Disease</th>
+<th colspan="4" align="center">Qwen3.5-27B</th>
+<th colspan="4" align="center">Qwen3-VL-8B</th>
+</tr>
+<tr>
+<th>ΔAUC</th><th>ΔF1</th><th>ΔRecall</th><th>ΔSpec</th>
+<th>ΔAUC</th><th>ΔF1</th><th>ΔRecall</th><th>ΔSpec</th>
+</tr>
+<tr><td>Enlarged Cardiomediastinum</td><td>0.1153</td><td>0.2525</td><td><b>0.4604</b></td><td>−0.2297</td><td>0.0729</td><td>0.1785</td><td>0.0451</td><td>0.1007</td></tr>
+<tr><td>Cardiomegaly</td><td>0.0101</td><td>−0.0085</td><td>0.0085</td><td>0.0118</td><td>0.0098</td><td>−0.0142</td><td>−0.0135</td><td>0.0331</td></tr>
+<tr><td>Lung Opacity</td><td>0.0265</td><td>0.0693</td><td><b>0.1272</b></td><td>−0.0740</td><td>0.0166</td><td>0.0540</td><td>0.1064</td><td>−0.0732</td></tr>
+<tr><td>Lung Lesion</td><td>0.0216</td><td>0.0603</td><td>0.0302</td><td>0.0130</td><td>−0.0051</td><td>−0.0337</td><td>−0.0238</td><td>0.0135</td></tr>
+<tr><td>Edema</td><td>0.0189</td><td>0.0993</td><td>0.0092</td><td>0.0288</td><td>0.0149</td><td>0.0871</td><td>0.0554</td><td>−0.0257</td></tr>
+<tr><td>Consolidation</td><td>0.0118</td><td>0.0319</td><td>0.0441</td><td>−0.0205</td><td>−0.0092</td><td>−0.0076</td><td>−0.0054</td><td>−0.0130</td></tr>
+<tr><td>Pneumonia</td><td>0.0160</td><td>−0.0305</td><td>0.0400</td><td>−0.0080</td><td>−0.0062</td><td>−0.0129</td><td>0.0000</td><td>−0.0124</td></tr>
+<tr><td>Atelectasis</td><td>0.0034</td><td>0.0226</td><td>0.0171</td><td>−0.0102</td><td>0.0038</td><td>0.0318</td><td>0.0170</td><td>−0.0094</td></tr>
+<tr><td>Pneumothorax</td><td>0.0253</td><td>0.0202</td><td>0.0529</td><td>−0.0022</td><td>−0.0102</td><td>−0.0339</td><td>−0.0204</td><td>0.0000</td></tr>
+<tr><td>Pleural Effusion</td><td>0.0112</td><td>0.0086</td><td>0.0103</td><td>0.0122</td><td>0.0130</td><td>0.0401</td><td>0.0393</td><td>−0.0134</td></tr>
+<tr><td>Pleural Other</td><td>−0.0019</td><td>−0.0074</td><td>−0.0044</td><td>0.0004</td><td>0.0127</td><td>0.0404</td><td>0.0250</td><td>0.0004</td></tr>
+<tr><td>Fracture</td><td>0.0003</td><td>0.0000</td><td>0.0000</td><td>0.0005</td><td>0.0010</td><td>0.0000</td><td>0.0000</td><td>0.0019</td></tr>
+<tr><td>Support Devices</td><td>0.0582</td><td>0.2354</td><td><b>0.4093</b></td><td>−0.2929</td><td>0.0385</td><td>0.1802</td><td>0.2323</td><td>−0.1553</td></tr>
+<tr><td>No Finding</td><td>0.1693</td><td>0.0361</td><td><b>0.4329</b></td><td>−0.0942</td><td>0.2800</td><td>0.3018</td><td>0.7067</td><td>−0.1468</td></tr>
+<tr><td><b>Macro Average</b></td><td><b>0.0348</b></td><td><b>0.0564</b></td><td><b>0.1169</b></td><td><b>−0.0475</b></td><td><b>0.0309</b></td><td><b>0.0579</b></td><td><b>0.0831</b></td><td><b>−0.0214</b></td></tr>
+</table>
 
 > **Key Insight**: Using Qwen3.5 as the labeler (instead of CheXbert) generally yields higher Recall but slightly lower Specificity. The LLM-based labeler is more sensitive to positive findings mentioned in the generated reports.
 
 ## 🔧 Supported Models
+
+The report generation script provides built-in support for the following Qwen models:
 
 | Model | `--model_name` | `--model_type` |
 |-------|---------------|----------------|
@@ -293,6 +321,8 @@ Below are our evaluation results comparing different models on the MIMIC-CXR tes
 | Qwen2.5-VL-72B | `Qwen/Qwen2.5-VL-72B-Instruct` | `auto` |
 | Qwen3-VL-8B | `Qwen/Qwen3-VL-8B-Instruct` | `qwen3vl` |
 | Qwen3.5-27B | `Qwen/Qwen3.5-27B` | `auto` |
+
+> 💡 **Other models**: The evaluation scripts (`evaluate_chexbert.py`, `evaluate_nlg.py`, `evaluate_llm_as_labeler.py`) are **model-agnostic**. As long as your generated reports follow the [output JSON format](#-output-format), you can use any VLM/LLM (e.g., GPT-4o, LLaVA-Med, CheXagent, etc.) for report generation and still evaluate with this toolkit.
 
 ## 📝 Notes
 
