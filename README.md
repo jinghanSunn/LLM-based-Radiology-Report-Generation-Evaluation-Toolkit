@@ -104,6 +104,22 @@ Then open `http://localhost:7860` in your browser.
 - **API mode**: Use any OpenAI-compatible API (OpenAI, vLLM, Ollama, Together AI, etc.)
 - **Local mode**: Load a HuggingFace model locally (requires GPU)
 - Optionally paste a ground truth report to compute metrics (BLEU, ROUGE-L, METEOR)
+- **🔎 Web Search RAG (optional, API mode)**: let the LLM autonomously retrieve
+  evidence from authoritative medical sites (Radiopaedia, PhysioNet, PubMed/NCBI,
+  Mayo Clinic, RSNA, ...) before writing the report. No local index, no extra
+  files needed — everything happens through the API's built-in `web_search` tool.
+  Provider is auto-routed from the model name:
+  - `gpt-*` → OpenAI `web_search` tool (with `allowed_domains` whitelist)
+  - `glm-*` → Zhipu `web_search` tool
+  - `qwen-*` → DashScope `enable_search` parameter
+  - `claude-*` → Anthropic `web_search_20250305` tool
+  - If the chosen API does not support web search, the report is generated
+    without retrieval and a warning is shown.
+- **📋 Retrieved Sources panel**: when web search is enabled, the URLs / titles /
+  snippets returned by the API are extracted and displayed in a sortable table.
+- **🕸️ RAG Knowledge Graph**: a Mermaid graph is automatically rendered showing
+  the relationship between detected radiology findings (e.g. *cardiomegaly*,
+  *pleural effusion*) and the retrieved web sources that ground them.
 
 **Options:**
 ```bash
