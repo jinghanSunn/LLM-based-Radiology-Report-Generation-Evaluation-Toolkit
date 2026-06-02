@@ -1,6 +1,20 @@
 # LLM-based Radiology Report Generation & Evaluation Toolkit (with Web Demo)
 
-A toolkit for generating radiology reports from chest X-ray images using Large Language Models (LLMs), and evaluating the generated reports with multiple clinical and NLG metrics. It also includes a **Gradio-based Web Demo** for interactive single-image report generation and evaluation.
+A toolkit for generating radiology reports from chest X-ray images using Large Language Models (LLMs), and — more importantly — evaluating those reports along **four complementary dimensions**, so a single number never tells the whole story.
+
+### 🎯 Multi-Dimensional Evaluation
+
+| Dimension | What it measures | How |
+|---|---|---|
+| **1. NLG quality** | Surface-level text similarity to the ground truth | BLEU-1/2/3/4, ROUGE-L, METEOR, BERTScore — via [`evaluate_nlg.py`](evaluate_nlg.py) |
+| **2. Clinical accuracy (model-based)** | Whether the same 14 CheXpert findings are mentioned with the correct polarity | CheXbert label extraction → AUC / F1 / Recall / Specificity, via [`evaluate_chexbert.py`](evaluate_chexbert.py) |
+| **3. Clinical accuracy (LLM-as-Labeler)** | Same 14-class agreement, but using an LLM as the labeler — no `chexbert.pth` checkpoint needed, fully API-driven | [`evaluate_llm_as_labeler.py`](evaluate_llm_as_labeler.py) (also available in the Web Demo) |
+| **4. Radiology-aware semantics** | Entity / relation overlap and clinical-term-weighted similarity | RadGraph F1, RaTEScore (via [`evaluate_nlg.py`](evaluate_nlg.py)) |
+| **5. LLM-as-Judge (qualitative)** | Per-case clinical-quality scores on **4 rubrics (1–10)** + explicit *missed* / *hallucinated* findings | Web Demo — see screenshot below |
+
+This **NLG ⨯ Clinical ⨯ Semantic ⨯ Judge** combination lets you tell apart a report that *reads* well from one that is *clinically* correct — the two often disagree.
+
+The toolkit also ships a **Gradio-based Web Demo** for interactive single-image report generation and evaluation, with optional **Web-Search RAG** and an auto-rendered **Knowledge Graph** linking findings to retrieved evidence.
 
 While we provide out-of-the-box support for Qwen series models (Qwen2.5-VL, Qwen3-VL, Qwen3.5), the evaluation pipeline is **model-agnostic** — any LLM-generated reports in the supported JSON format can be evaluated.
 
