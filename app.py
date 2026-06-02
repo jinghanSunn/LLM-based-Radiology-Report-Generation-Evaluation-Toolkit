@@ -866,6 +866,355 @@ def generate_report_local(
 
 
 # ============================================================
+# LLM-as-Judge (B): clinical-quality evaluation by another LLM
+# ============================================================
+
+JUDGE_SYSTEM_PROMPT = (
+    "You are an expert chest radiologist acting as an evaluator. "
+    "You compare an AI-generated radiology report against a ground-truth "
+    "reference report and rate the AI report on multiple clinical and "
+    "linguistic dimensions. You MUST output STRICT JSON only, no prose, "
+    "no markdown fences."
+)
+
+JUDGE_USER_TEMPLATE = (
+    "Evaluate the AI-generated chest X-ray report below against the "
+    "ground-truth reference. Score each dimension on a 1-10 integer scale "
+    "(10 = perfect). Also list any clinically important findings that the "
+    "AI report MISSED (present in reference but absent in AI report) and "
+    "any HALLUCINATED findings (asserted by AI report but not supported "
+    "by the reference).\n\n"
+    "Dimensions:\n"
+    "  1. findings_accuracy   - correctness of described findings vs reference\n"
+    "  2. impression_correctness - correctness of the diagnostic impression\n"
+    "  3. fluency             - readability, grammar, professional tone\n"
+    "  4. clinical_safety     - absence of dangerous omissions or false positives\n\n"
+    "AI-generated report:\n\"\"\"\n{pred}\n\"\"\"\n\n"
+    "Ground-truth reference:\n\"\"\"\n{gt}\n\"\"\"\n\n"
+    "Respond with STRICT JSON in this exact shape:\n"
+    "{{\n"
+    "  \"findings_accuracy\": {{\"score\": <1-10>, \"reason\": \"...\"}},\n"
+    "  \"impression_correctness\": {{\"score\": <1-10>, \"reason\": \"...\"}},\n"
+    "  \"fluency\": {{\"score\": <1-10>, \"reason\": \"...\"}},\n"
+    "  \"clinical_safety\": {{\"score\": <1-10>, \"reason\": \"...\"}},\n"
+    "  \"missed_findings\": [\"...\"],\n"
+    "  \"hallucinated_findings\": [\"...\"],\n"
+    "  \"overall_summary\": \"one short paragraph of overall judgement\"\n"
+    "}}"
+)
+
+
+def _strip_report_footer(report: str) -> str:
+    """Remove the Markdown footer we appended (generation time + model)."""
+    if not report:
+        return ""
+    # Drop everything after the last horizontal rule we added
+    return re.split(r"\n---\n<sub>", report, maxsplit=1)[0].strip()
+
+
+def _extract_first_json(text: str) -> str:
+    """Extract first balanced JSON object from text (tolerant of code fences)."""
+    if not text:
+        return ""
+    text = re.sub(r"```(?:json)?", "", text, flags=re.IGNORECASE).replace("```", "")
+    start = text.find("{")
+    if start == -1:
+        return ""
+    depth = 0
+    for i in range(start, len(text)):
+        c = text[i]
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1]
+    return ""
+
+
+def _call_text_llm(api_key: str, api_base: str, model_name: str,
+                   system_prompt: str, user_prompt: str,
+                   max_tokens: int = 1024, temperature: float = 0.0) -> str:
+    """Call an OpenAI-compatible chat completion with a text-only message."""
+    from openai import OpenAI
+    client = OpenAI(
+        api_key=api_key,
+        base_url=api_base if api_base.strip() else None,
+        timeout=120.0,
+    )
+    resp = client.chat.completions.create(
+        model=model_name,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        max_tokens=max_tokens,
+        temperature=temperature,
+    )
+    text = resp.choices[0].message.content or ""
+    # Strip any thinking tags
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+    return text
+
+
+def run_llm_judge(generated_report: str, ground_truth: str,
+                  api_key: str, api_base: str, model_name: str) -> str:
+    """Run LLM-as-Judge and return Markdown-formatted result."""
+    if not generated_report or not generated_report.strip():
+        return "⚠️ Generate a report first before running the LLM Judge."
+    if generated_report.startswith("❌"):
+        return "⚠️ The generated report contains an error; cannot judge."
+    if not ground_truth or not ground_truth.strip():
+        return "⚠️ Please paste a ground-truth report (left panel) so the Judge has a reference."
+    if not api_key or not api_key.strip():
+        return "⚠️ Please provide an API key (left panel) — the Judge reuses your current API."
+    try:
+        from openai import OpenAI  # noqa: F401
+    except ImportError:
+        return "❌ openai package not installed. Run: pip install openai"
+
+    pred = _strip_report_footer(generated_report)
+    user_msg = JUDGE_USER_TEMPLATE.format(pred=pred[:6000], gt=ground_truth.strip()[:6000])
+
+    try:
+        raw = _call_text_llm(
+            api_key, api_base, model_name,
+            JUDGE_SYSTEM_PROMPT, user_msg,
+            max_tokens=1024, temperature=0.0,
+        )
+    except Exception as e:
+        return f"❌ Judge API error: {e}"
+
+    blob = _extract_first_json(raw)
+    if not blob:
+        return f"❌ Could not parse Judge output as JSON.\n\n**Raw output:**\n```\n{raw[:2000]}\n```"
+    try:
+        obj = json.loads(blob)
+    except Exception as e:
+        return f"❌ JSON decode error: {e}\n\n**Raw output:**\n```\n{raw[:2000]}\n```"
+
+    dims = ["findings_accuracy", "impression_correctness", "fluency", "clinical_safety"]
+    pretty_names = {
+        "findings_accuracy": "Findings Accuracy",
+        "impression_correctness": "Impression Correctness",
+        "fluency": "Fluency",
+        "clinical_safety": "Clinical Safety",
+    }
+
+    lines = ["### 🤖 LLM-as-Judge Result", "",
+             "| Dimension | Score (1-10) | Reason |",
+             "|---|---|---|"]
+    scores = []
+    for d in dims:
+        entry = obj.get(d, {}) or {}
+        sc = entry.get("score")
+        rs = (entry.get("reason") or "").replace("|", "\\|").replace("\n", " ")
+        sc_str = f"{sc}" if isinstance(sc, (int, float)) else "N/A"
+        if isinstance(sc, (int, float)):
+            scores.append(float(sc))
+        lines.append(f"| {pretty_names[d]} | **{sc_str}** | {rs} |")
+
+    if scores:
+        avg = sum(scores) / len(scores)
+        lines.append(f"| **Average** | **{avg:.2f}** | |")
+
+    missed = obj.get("missed_findings") or []
+    hallu = obj.get("hallucinated_findings") or []
+    summary = obj.get("overall_summary") or ""
+
+    lines.append("")
+    lines.append("**🩺 Missed Findings (in reference but absent in AI report):**")
+    if missed:
+        lines.extend([f"- {m}" for m in missed])
+    else:
+        lines.append("- _None reported_")
+    lines.append("")
+    lines.append("**⚠️ Hallucinated Findings (in AI report but not supported by reference):**")
+    if hallu:
+        lines.extend([f"- {h}" for h in hallu])
+    else:
+        lines.append("- _None reported_")
+    lines.append("")
+    if summary:
+        lines.append(f"**📝 Overall Summary:** {summary}")
+    lines.append("")
+    lines.append(f"<sub>Judged by: `{model_name}`</sub>")
+
+    return "\n".join(lines)
+
+
+# ============================================================
+# LLM-as-Labeler (C): 14-class CheXpert agreement via remote LLM
+# ============================================================
+
+CHEXPERT_LABELS = [
+    "Enlarged Cardiomediastinum", "Cardiomegaly", "Lung Opacity",
+    "Lung Lesion", "Edema", "Consolidation", "Pneumonia", "Atelectasis",
+    "Pneumothorax", "Pleural Effusion", "Pleural Other", "Fracture",
+    "Support Devices", "No Finding",
+]
+
+LABELER_SYSTEM_PROMPT = (
+    "You are a clinical information-extraction assistant for chest X-ray "
+    "radiology reports. Given a report, you decide, for each of the 14 "
+    "CheXpert conditions, whether the report asserts the condition is PRESENT."
+)
+
+LABELER_USER_TEMPLATE = (
+    "Read the following chest X-ray report and, for each of the 14 CheXpert "
+    "conditions listed below, output 1 if the report asserts the condition is "
+    "PRESENT (explicit positive finding), otherwise output 0.\n\n"
+    "Labeling rules (U-zeros, MUST follow strictly):\n"
+    "  - Explicitly denied (e.g. \"no pneumothorax\") -> 0\n"
+    "  - Uncertain / hedged (e.g. \"possible\", \"may represent\") -> 0\n"
+    "  - Not mentioned -> 0\n"
+    "  - Only explicit positive assertions -> 1\n"
+    "  - \"No Finding\" = 1 if and only if the report explicitly states the study "
+    "is normal / shows no acute abnormality.\n\n"
+    "The 14 conditions (use these EXACT keys, in this order):\n"
+    "  Enlarged Cardiomediastinum, Cardiomegaly, Lung Opacity, Lung Lesion, "
+    "Edema, Consolidation, Pneumonia, Atelectasis, Pneumothorax, "
+    "Pleural Effusion, Pleural Other, Fracture, Support Devices, No Finding\n\n"
+    "Report:\n\"\"\"\n{report_text}\n\"\"\"\n\n"
+    "Respond with STRICT JSON only, exactly 14 keys mapped to integer 0 or 1, "
+    "no prose, no markdown."
+)
+
+
+def _label_one_report(report_text: str, api_key: str, api_base: str, model_name: str) -> dict:
+    """Call labeler LLM on a single report. Returns dict {label: 0/1}.
+    On any failure returns all-zero dict + error key."""
+    if not report_text or not report_text.strip():
+        return {k: 0 for k in CHEXPERT_LABELS}
+
+    user_msg = LABELER_USER_TEMPLATE.format(report_text=report_text.strip()[:6000])
+    try:
+        raw = _call_text_llm(
+            api_key, api_base, model_name,
+            LABELER_SYSTEM_PROMPT, user_msg,
+            max_tokens=400, temperature=0.0,
+        )
+    except Exception as e:
+        out = {k: 0 for k in CHEXPERT_LABELS}
+        out["__error__"] = f"api_error: {e}"
+        return out
+
+    blob = _extract_first_json(raw)
+    if not blob:
+        out = {k: 0 for k in CHEXPERT_LABELS}
+        out["__error__"] = "no_json_blob"
+        out["__raw__"] = raw[:500]
+        return out
+    try:
+        obj = json.loads(blob)
+    except Exception as e:
+        out = {k: 0 for k in CHEXPERT_LABELS}
+        out["__error__"] = f"json_decode_error: {e}"
+        out["__raw__"] = raw[:500]
+        return out
+
+    lower_map = {str(k).lower().strip(): v for k, v in obj.items()}
+    result = {}
+    for name in CHEXPERT_LABELS:
+        v = lower_map.get(name.lower().strip(), 0)
+        try:
+            iv = int(v)
+        except (TypeError, ValueError):
+            if isinstance(v, str) and v.strip().lower() in ("1", "true", "yes", "positive", "present"):
+                iv = 1
+            else:
+                iv = 0
+        result[name] = 1 if iv == 1 else 0
+    return result
+
+
+def run_llm_labeler(generated_report: str, ground_truth: str,
+                    api_key: str, api_base: str, model_name: str):
+    """Label both AI report and ground truth with a remote LLM, return:
+       (markdown_summary, table_rows for gr.Dataframe).
+    """
+    empty_table = []
+    if not generated_report or not generated_report.strip():
+        return "⚠️ Generate a report first before running the LLM Labeler.", empty_table
+    if generated_report.startswith("❌"):
+        return "⚠️ The generated report contains an error; cannot label.", empty_table
+    if not ground_truth or not ground_truth.strip():
+        return ("⚠️ Please paste a ground-truth report (left panel) so the labeler "
+                "can compare 14-class CheXpert agreement."), empty_table
+    if not api_key or not api_key.strip():
+        return "⚠️ Please provide an API key (left panel).", empty_table
+    try:
+        from openai import OpenAI  # noqa: F401
+    except ImportError:
+        return "❌ openai package not installed. Run: pip install openai", empty_table
+
+    pred_text = _strip_report_footer(generated_report)
+    pred_labels = _label_one_report(pred_text, api_key, api_base, model_name)
+    gt_labels = _label_one_report(ground_truth, api_key, api_base, model_name)
+
+    pred_err = pred_labels.pop("__error__", None)
+    gt_err = gt_labels.pop("__error__", None)
+    pred_labels.pop("__raw__", None)
+    gt_labels.pop("__raw__", None)
+
+    rows = []
+    n_agree = 0
+    n_total = len(CHEXPERT_LABELS)
+    n_pred_pos = 0
+    n_gt_pos = 0
+    tp = fp = fn = tn = 0
+    for name in CHEXPERT_LABELS:
+        p = int(pred_labels.get(name, 0))
+        g = int(gt_labels.get(name, 0))
+        if p == g:
+            n_agree += 1
+            agree_str = "✅"
+        else:
+            agree_str = "❌"
+        if p == 1 and g == 1:
+            tp += 1
+            status = "TP (both positive)"
+        elif p == 1 and g == 0:
+            fp += 1
+            status = "FP (hallucinated)"
+        elif p == 0 and g == 1:
+            fn += 1
+            status = "FN (missed)"
+        else:
+            tn += 1
+            status = "TN (both negative)"
+        n_pred_pos += p
+        n_gt_pos += g
+        rows.append([name, "✓" if g else "·", "✓" if p else "·", agree_str, status])
+
+    accuracy = n_agree / n_total if n_total else 0.0
+    precision = tp / (tp + fp) if (tp + fp) else 0.0
+    recall = tp / (tp + fn) if (tp + fn) else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
+
+    lines = ["### 🏷️ LLM-as-Labeler Result (14-class CheXpert)"]
+    if pred_err or gt_err:
+        if pred_err:
+            lines.append(f"- ⚠️ Prediction labeling issue: `{pred_err}`")
+        if gt_err:
+            lines.append(f"- ⚠️ Ground-truth labeling issue: `{gt_err}`")
+    lines.append("")
+    lines.append("| Metric | Value |")
+    lines.append("|---|---|")
+    lines.append(f"| Class-wise agreement | **{n_agree}/{n_total}** ({accuracy*100:.1f}%) |")
+    lines.append(f"| Positive findings (GT) | {n_gt_pos} |")
+    lines.append(f"| Positive findings (AI) | {n_pred_pos} |")
+    lines.append(f"| TP / FP / FN / TN | {tp} / {fp} / {fn} / {tn} |")
+    lines.append(f"| Precision | {precision:.3f} |")
+    lines.append(f"| Recall (sensitivity) | {recall:.3f} |")
+    lines.append(f"| F1 | **{f1:.3f}** |")
+    lines.append("")
+    lines.append(f"<sub>Labeled by: `{model_name}`</sub>")
+
+    return "\n".join(lines), rows
+
+
+# ============================================================
 # Main Gradio Interface
 # ============================================================
 
@@ -1101,6 +1450,43 @@ Optionally provide a ground truth report to compute evaluation metrics (BLEU, RO
                         label="Findings ↔ Sources relationship graph",
                     )
 
+                # ----------------------------------------------------------------
+                # B. LLM-as-Judge: clinical-quality scoring by another LLM
+                # ----------------------------------------------------------------
+                with gr.Accordion("🤖 LLM-as-Judge (clinical-quality scoring)", open=False):
+                    gr.Markdown(
+                        "Use the same API to ask another LLM to score the generated "
+                        "report on 4 clinical dimensions (1–10) and list missed / "
+                        "hallucinated findings. Requires a ground-truth report."
+                    )
+                    judge_btn = gr.Button("🧑‍⚖️ Run LLM Judge", variant="secondary")
+                    judge_output = gr.Markdown(
+                        value="_Click the button above after generating a report and pasting ground truth._"
+                    )
+
+                # ----------------------------------------------------------------
+                # C. LLM-as-Labeler: 14-class CheXpert agreement
+                # ----------------------------------------------------------------
+                with gr.Accordion("🏷️ LLM-as-Labeler (14-class CheXpert agreement)", open=False):
+                    gr.Markdown(
+                        "Ask the LLM to extract 14 CheXpert binary labels from BOTH "
+                        "the AI report and the ground truth, then compare them "
+                        "(class-wise agreement, precision, recall, F1)."
+                    )
+                    labeler_btn = gr.Button("🏷️ Run LLM Labeler", variant="secondary")
+                    labeler_output = gr.Markdown(
+                        value="_Click the button above after generating a report and pasting ground truth._"
+                    )
+                    labeler_table = gr.Dataframe(
+                        headers=["Condition", "GT", "AI", "Agree?", "Status"],
+                        datatype=["str", "str", "str", "str", "str"],
+                        row_count=(0, "dynamic"),
+                        col_count=(5, "fixed"),
+                        interactive=False,
+                        wrap=True,
+                        label="Per-class CheXpert label comparison",
+                    )
+
         # Event handlers
         generate_btn.click(
             fn=generate_and_evaluate,
@@ -1158,6 +1544,32 @@ Optionally provide a ground truth report to compute evaluation metrics (BLEU, RO
             outputs=[api_base_input, model_name_input, preset_hint],
         )
 
+        # ----- B. LLM-as-Judge button -----
+        judge_btn.click(
+            fn=run_llm_judge,
+            inputs=[
+                report_output,        # generated report (markdown)
+                ground_truth_input,
+                api_key_input,
+                api_base_input,
+                model_name_input,
+            ],
+            outputs=[judge_output],
+        )
+
+        # ----- C. LLM-as-Labeler button -----
+        labeler_btn.click(
+            fn=run_llm_labeler,
+            inputs=[
+                report_output,
+                ground_truth_input,
+                api_key_input,
+                api_base_input,
+                model_name_input,
+            ],
+            outputs=[labeler_output, labeler_table],
+        )
+
         # Examples
         gr.Markdown("""
 ---
@@ -1166,6 +1578,8 @@ Optionally provide a ground truth report to compute evaluation metrics (BLEU, RO
 - **API Mode**: Works with any OpenAI-compatible endpoint. For local vLLM servers, set the base URL to `http://localhost:8000/v1`.
 - **Local Mode**: Requires a GPU with sufficient VRAM. The model is cached after first load.
 - **Metrics**: BLEU, ROUGE-L, and METEOR are computed instantly (no GPU needed).
+- **LLM-as-Judge** (🤖): Reuses your API to ask another LLM to grade the report on 4 clinical dimensions (1–10) plus missed / hallucinated findings.
+- **LLM-as-Labeler** (🏷️): Reuses your API to extract 14-class CheXpert labels from both the AI report and the ground truth, then computes class-wise agreement, precision, recall, F1 — purely API-based, no chexbert.pth needed.
 - **Web Search RAG**: Lets the LLM autonomously retrieve from medical websites \
   (Radiopaedia, PhysioNet, PubMed/NCBI, etc.) before writing the report — \
   no local index or extra files needed. Provider is auto-routed:
