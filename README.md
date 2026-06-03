@@ -104,7 +104,7 @@ Place it at `./checkpoints/chexbert.pth` (or specify via `--chexbert_checkpoint`
 
 A simple web interface for single-image report generation and evaluation:
 
-![Web Demo — Main Interface](https://assets.with.tencent.com/copilot/7438f6b1-9995-4af6-bf25-1ae40e980830/image-019e8711944d7dd08f3a7f577e436b06.png)
+![Web Demo — Main Interface](assets/web_demo_main.png)
 
 ```bash
 pip install gradio openai
@@ -115,13 +115,13 @@ python app.py
 
 Reuses your API to ask another LLM to grade the generated report on **4 clinical dimensions (1–10)** and to list **missed / hallucinated** findings against the ground truth.
 
-![LLM-as-Judge Result](https://assets.with.tencent.com/copilot/d2b9c1e6-db29-45ff-8708-365c96ba803f/image-019e8711dfb07dd08f3a854048e52bfc.png)
+![LLM-as-Judge Result](assets/llm_judge.png)
 
 #### 🏷️ LLM-as-Labeler (14-class CheXpert agreement)
 
 Reuses your API to extract 14 CheXpert binary labels from **both** the AI report and the ground truth, then computes class-wise agreement, precision, recall and F1 — purely API-based, no `chexbert.pth` required.
 
-![LLM-as-Labeler Result](https://assets.with.tencent.com/copilot/7fa7f166-c5ba-470f-8e3c-a031eb1ab696/image-019e871215fc7dd08f3a8c5391896be9.png)
+![LLM-as-Labeler Result](assets/llm_labeler.png)
 
 Then open `http://localhost:7860` in your browser.
 
