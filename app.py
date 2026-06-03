@@ -1302,34 +1302,213 @@ def generate_and_evaluate(
 def build_app():
     """Build the Gradio interface."""
 
+    # ------------------------------------------------------------------
+    # Professional medical-AI inspired theme + custom CSS
+    # ------------------------------------------------------------------
+    custom_theme = gr.themes.Soft(
+        primary_hue=gr.themes.colors.blue,
+        secondary_hue=gr.themes.colors.indigo,
+        neutral_hue=gr.themes.colors.slate,
+        font=[gr.themes.GoogleFont("Inter"), "ui-sans-serif", "system-ui", "sans-serif"],
+        font_mono=[gr.themes.GoogleFont("JetBrains Mono"), "ui-monospace", "Consolas", "monospace"],
+    ).set(
+        body_background_fill="#f6f8fb",
+        body_background_fill_dark="#0b1220",
+        background_fill_primary="#ffffff",
+        background_fill_secondary="#f1f5f9",
+        block_background_fill="#ffffff",
+        block_border_width="1px",
+        block_border_color="#e5e7eb",
+        block_radius="14px",
+        block_shadow="0 1px 2px rgba(15,23,42,0.04), 0 4px 12px rgba(15,23,42,0.04)",
+        block_label_background_fill="#f8fafc",
+        block_label_text_color="#334155",
+        block_label_text_weight="600",
+        block_title_text_color="#0f172a",
+        block_title_text_weight="700",
+        button_primary_background_fill="linear-gradient(135deg,#2563eb 0%,#4f46e5 100%)",
+        button_primary_background_fill_hover="linear-gradient(135deg,#1d4ed8 0%,#4338ca 100%)",
+        button_primary_text_color="#ffffff",
+        button_primary_shadow="0 4px 14px rgba(37,99,235,0.35)",
+        button_secondary_background_fill="#ffffff",
+        button_secondary_background_fill_hover="#eff6ff",
+        button_secondary_border_color="#c7d2fe",
+        button_secondary_text_color="#1e3a8a",
+        input_background_fill="#ffffff",
+        input_border_color="#e2e8f0",
+        input_border_color_focus="#2563eb",
+        input_shadow_focus="0 0 0 3px rgba(37,99,235,0.15)",
+        slider_color="#2563eb",
+    )
+
     custom_css = """
-    * {
-        font-family: Georgia, 'Times New Roman', Times, serif !important;
+    /* ---------- Global tweaks ---------- */
+    .gradio-container {
+        max-width: 1480px !important;
+        margin: 0 auto !important;
+        background:
+            radial-gradient(circle at 20% 0%, rgba(99,102,241,0.07), transparent 40%),
+            radial-gradient(circle at 90% 10%, rgba(14,165,233,0.07), transparent 45%),
+            #f6f8fb !important;
     }
-    code, pre, .code, .mono {
-        font-family: 'Courier New', Courier, monospace !important;
+    body, .gradio-container, .gradio-container * {
+        font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
     }
+    /* Reports / generated medical text use a serious serif */
+    #report_md_output, #report_md_output * {
+        font-family: 'Source Serif 4','Charter','Georgia','Times New Roman',serif !important;
+        font-size: 15px !important;
+        line-height: 1.7 !important;
+        color: #0f172a !important;
+    }
+    code, pre, .code, .mono, kbd, samp {
+        font-family: 'JetBrains Mono','Fira Code','Courier New',monospace !important;
+    }
+
+    /* ---------- HERO banner ---------- */
+    .hero-banner {
+        position: relative;
+        overflow: hidden;
+        border-radius: 18px;
+        padding: 26px 30px 22px 30px;
+        margin: 0 0 18px 0;
+        color: #f8fafc;
+        background:
+            linear-gradient(135deg, rgba(15,23,42,0.85) 0%, rgba(30,58,138,0.85) 50%, rgba(67,56,202,0.85) 100%),
+            url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><path d='M0 20h40M20 0v40' stroke='%23ffffff' stroke-opacity='0.06' stroke-width='1'/></svg>");
+        box-shadow: 0 10px 30px rgba(15,23,42,0.20), inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    .hero-banner::before {
+        content: "";
+        position: absolute; inset: -40% -10% auto auto;
+        width: 360px; height: 360px;
+        background: radial-gradient(circle, rgba(56,189,248,0.45) 0%, transparent 60%);
+        pointer-events: none;
+        filter: blur(20px);
+    }
+    .hero-row { display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
+    .hero-logo {
+        width:54px; height:54px; flex:0 0 54px;
+        border-radius:14px;
+        display:flex; align-items:center; justify-content:center;
+        font-size:28px;
+        background:linear-gradient(135deg,#38bdf8,#6366f1);
+        box-shadow:0 6px 18px rgba(56,189,248,0.45), inset 0 1px 0 rgba(255,255,255,0.4);
+    }
+    .hero-title {
+        font-size: 26px; font-weight: 800; letter-spacing:-0.01em; margin:0;
+        background: linear-gradient(90deg,#ffffff 0%,#cbd5e1 100%);
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .hero-subtitle {
+        font-size: 14px; color: #cbd5e1; margin: 4px 0 0 0; max-width: 880px;
+    }
+    .hero-pills { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+    .hero-pill {
+        font-size: 12px; font-weight: 600;
+        padding: 5px 11px; border-radius: 999px;
+        background: rgba(255,255,255,0.10);
+        border: 1px solid rgba(255,255,255,0.18);
+        color: #e2e8f0;
+        backdrop-filter: blur(6px);
+    }
+    .hero-pill.green { background:rgba(34,197,94,0.18); border-color:rgba(34,197,94,0.35); color:#bbf7d0; }
+    .hero-pill.amber { background:rgba(245,158,11,0.18); border-color:rgba(245,158,11,0.35); color:#fde68a; }
+    .hero-pill.cyan  { background:rgba(56,189,248,0.18); border-color:rgba(56,189,248,0.35); color:#bae6fd; }
+
+    /* ---------- Section headers ---------- */
+    .section-h {
+        display:flex; align-items:center; gap:10px;
+        margin: 6px 0 10px 0;
+        font-weight: 700; font-size: 15px; color:#0f172a;
+        padding-left: 10px; border-left: 3px solid #2563eb;
+    }
+    .section-h .badge {
+        font-size: 11px; font-weight: 600;
+        padding: 2px 8px; border-radius: 999px;
+        background:#eff6ff; color:#1d4ed8; border:1px solid #c7d2fe;
+    }
+
+    /* ---------- Card-ish blocks ---------- */
+    .gradio-container .block,
+    .gradio-container .form,
+    .gradio-container .gr-group {
+        border-radius: 14px !important;
+    }
+    .gradio-container .gr-button-primary {
+        font-weight: 700 !important;
+        letter-spacing: 0.01em;
+        transition: transform .15s ease, box-shadow .15s ease;
+    }
+    .gradio-container .gr-button-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 20px rgba(37,99,235,0.40);
+    }
+
+    /* Accordion polish */
+    .gradio-container .label-wrap {
+        font-weight: 600 !important;
+    }
+
+    /* Dataframe polish */
+    .gradio-container table {
+        border-collapse: separate !important;
+        border-spacing: 0 !important;
+    }
+    .gradio-container table thead th {
+        background: #f1f5f9 !important;
+        font-weight: 700 !important;
+        color: #334155 !important;
+    }
+
+    /* Footer / tip box */
+    .tip-box {
+        margin-top: 14px;
+        padding: 14px 18px;
+        background: linear-gradient(135deg,#f8fafc 0%, #eff6ff 100%);
+        border: 1px solid #dbeafe;
+        border-radius: 14px;
+        font-size: 13px; color: #334155; line-height: 1.65;
+    }
+    .tip-box code { background:#e0e7ff; color:#3730a3; padding:1px 6px; border-radius:4px; font-size:12px; }
+    .tip-box b { color:#1e3a8a; }
     """
 
+    HERO_HTML = """
+<div class="hero-banner">
+  <div class="hero-row">
+    <div class="hero-logo">🩺</div>
+    <div style="flex:1; min-width:260px;">
+      <h1 class="hero-title">RadiologyAI · Report Generation & Evaluation Studio</h1>
+      <p class="hero-subtitle">
+        An end-to-end research demo for chest X-ray reporting with LLMs &mdash;
+        generation, web-grounded RAG, knowledge graph and multi-dimensional clinical evaluation.
+      </p>
+      <div class="hero-pills">
+        <span class="hero-pill green">● Online</span>
+        <span class="hero-pill cyan">Vision-Language Models</span>
+        <span class="hero-pill cyan">Web-grounded RAG</span>
+        <span class="hero-pill cyan">Knowledge Graph</span>
+        <span class="hero-pill amber">LLM-as-Judge</span>
+        <span class="hero-pill amber">14-class CheXpert Labeler</span>
+        <span class="hero-pill">BLEU · ROUGE · METEOR</span>
+      </div>
+    </div>
+  </div>
+</div>
+"""
+
     with gr.Blocks(
-        title="🏥 Radiology Report Generation & Evaluation",
+        title="RadiologyAI · Report Generation & Evaluation Studio",
+        theme=custom_theme,
         css=custom_css,
     ) as app:
-        gr.Markdown("""
-# 🏥 Radiology Report Generation & Evaluation
+        gr.HTML(HERO_HTML)
 
-Upload a chest X-ray image and generate a radiology report using an LLM.
-Optionally provide a ground truth report to compute evaluation metrics (BLEU, ROUGE-L, METEOR).
-
-**Two modes available:**
-- **API mode**: Use any OpenAI-compatible API (vLLM, Ollama, OpenAI, Together AI, etc.)
-- **Local mode**: Load a HuggingFace model locally (requires GPU)
-        """)
-
-        with gr.Row():
+        with gr.Row(equal_height=False):
             # Left column: Input
             with gr.Column(scale=1):
-                gr.Markdown("### 📤 Input")
+                gr.HTML('<div class="section-h">📤 Study Input <span class="badge">Step 1</span></div>')
 
                 image_input = gr.Image(
                     label="Chest X-ray Image",
@@ -1385,7 +1564,7 @@ Optionally provide a ground truth report to compute evaluation metrics (BLEU, RO
                     step=64,
                 )
 
-                gr.Markdown("### 🔎 Web Search RAG (optional, API mode)")
+                gr.HTML('<div class="section-h">🔎 Web-grounded RAG <span class="badge">Optional · API mode</span></div>')
                 enable_web_search_input = gr.Checkbox(
                     label="Enable web search (let the LLM retrieve from medical sites)",
                     value=False,
@@ -1407,18 +1586,18 @@ Optionally provide a ground truth report to compute evaluation metrics (BLEU, RO
                         lines=2,
                     )
 
-                gr.Markdown("### 📋 Ground Truth (optional)")
+                gr.HTML('<div class="section-h">📋 Reference Report <span class="badge">Optional · for evaluation</span></div>')
                 ground_truth_input = gr.Textbox(
                     label="Ground Truth Report",
                     placeholder="Paste the reference radiology report here for evaluation...",
                     lines=5,
                 )
 
-                generate_btn = gr.Button("🚀 Generate Report", variant="primary", size="lg")
+                generate_btn = gr.Button("🚀  Generate Radiology Report", variant="primary", size="lg")
 
             # Right column: Output
             with gr.Column(scale=1):
-                gr.Markdown("### 📝 Generated Report")
+                gr.HTML('<div class="section-h">📝 Generated Report <span class="badge">Step 2</span></div>')
                 report_output = gr.Markdown(
                     value="_The generated report will appear here (Markdown rendered)._",
                     height=420,
@@ -1428,7 +1607,7 @@ Optionally provide a ground truth report to compute evaluation metrics (BLEU, RO
                     elem_id="report_md_output",
                 )
 
-                gr.Markdown("### 📊 Evaluation Metrics")
+                gr.HTML('<div class="section-h">📊 Evaluation Metrics <span class="badge">BLEU · ROUGE-L · METEOR</span></div>')
                 metrics_output = gr.Markdown(
                     value="💡 Generate a report and provide ground truth to see metrics here."
                 )
@@ -1571,22 +1750,26 @@ Optionally provide a ground truth report to compute evaluation metrics (BLEU, RO
         )
 
         # Examples
-        gr.Markdown("""
----
-### 💡 Tips
-
-- **API Mode**: Works with any OpenAI-compatible endpoint. For local vLLM servers, set the base URL to `http://localhost:8000/v1`.
-- **Local Mode**: Requires a GPU with sufficient VRAM. The model is cached after first load.
-- **Metrics**: BLEU, ROUGE-L, and METEOR are computed instantly (no GPU needed).
-- **LLM-as-Judge** (🤖): Reuses your API to ask another LLM to grade the report on 4 clinical dimensions (1–10) plus missed / hallucinated findings.
-- **LLM-as-Labeler** (🏷️): Reuses your API to extract 14-class CheXpert labels from both the AI report and the ground truth, then computes class-wise agreement, precision, recall, F1 — purely API-based, no chexbert.pth needed.
-- **Web Search RAG**: Lets the LLM autonomously retrieve from medical websites \
-  (Radiopaedia, PhysioNet, PubMed/NCBI, etc.) before writing the report — \
-  no local index or extra files needed. Provider is auto-routed:
-  `gpt-*` → OpenAI · `glm-*` → Zhipu · `qwen-*` → DashScope · `claude-*` → Anthropic.
-  If the chosen API does not support web search, the report is generated without retrieval.
-- **Supported API providers**: OpenAI, Azure OpenAI, vLLM, Ollama (`http://localhost:11434/v1`), Together AI, Zhipu (`https://open.bigmodel.cn/api/paas/v4`), DashScope (`https://dashscope.aliyuncs.com/compatible-mode/v1`).
-        """)
+        gr.HTML("""
+<div class="tip-box">
+  <div style="font-weight:700; color:#1e3a8a; margin-bottom:8px; font-size:14px;">
+    💡 Quick Reference Guide
+  </div>
+  <ul style="margin:0; padding-left:18px;">
+    <li><b>API Mode</b> — works with any OpenAI-compatible endpoint. For local vLLM servers, set the base URL to <code>http://localhost:8000/v1</code>.</li>
+    <li><b>Local Mode</b> — loads a Hugging Face VLM directly; requires a GPU with sufficient VRAM. Models are cached after the first load.</li>
+    <li><b>NLG Metrics</b> — BLEU, ROUGE-L and METEOR are computed instantly when a ground-truth report is supplied (no GPU needed).</li>
+    <li><b>🤖 LLM-as-Judge</b> — reuses your API to score the report on 4 clinical dimensions (1–10) and list missed / hallucinated findings.</li>
+    <li><b>🏷️ LLM-as-Labeler</b> — reuses your API to extract 14-class CheXpert labels from both reports and computes class-wise agreement, precision, recall, and F1 (no <code>chexbert.pth</code> required).</li>
+    <li><b>🔎 Web-grounded RAG</b> — lets the LLM autonomously retrieve from medical sites (Radiopaedia, PhysioNet, PubMed/NCBI, …) before writing the report. Provider auto-routing:
+      <code>gpt-*</code> → OpenAI · <code>glm-*</code> → Zhipu · <code>qwen-*</code> → DashScope · <code>claude-*</code> → Anthropic.</li>
+    <li><b>Supported providers</b> — OpenAI, Azure OpenAI, vLLM, Ollama (<code>http://localhost:11434/v1</code>), Together AI, Zhipu (<code>https://open.bigmodel.cn/api/paas/v4</code>), DashScope (<code>https://dashscope.aliyuncs.com/compatible-mode/v1</code>).</li>
+  </ul>
+  <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #c7d2fe; font-size:12px; color:#64748b;">
+    Built for the <i>“When Small Models Speak”</i> research project · for academic & demo use only · not a medical device.
+  </div>
+</div>
+""")
 
     return app
 
